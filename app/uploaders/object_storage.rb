@@ -179,10 +179,10 @@ module ObjectStorage
         model_class.uploader_options.dig(mount_point, :mount_on) || mount_point
       end
 
-      def workhorse_authorize(has_length:, maximum_size: nil)
+      def workhorse_authorize(has_length:, maximum_size: nil, blob_class:)
         {}.tap do |hash|
           if self.object_store_enabled? && self.direct_upload_enabled?
-            hash[:RemoteObject] = workhorse_remote_upload_options(has_length: has_length, maximum_size: maximum_size)
+            hash[:RemoteObject] = workhorse_remote_upload_options(has_length: has_length, maximum_size: maximum_size, blob_class: blob_class)
           else
             hash[:TempPath] = workhorse_local_upload_path
           end
@@ -199,16 +199,20 @@ module ObjectStorage
         ObjectStorage::Config.new(object_store_options)
       end
 
-      def workhorse_remote_upload_options(has_length:, maximum_size: nil)
+      def workhorse_remote_upload_options(has_length:, maximum_size: nil, blob_class: nil)
         return unless self.object_store_enabled?
         return unless self.direct_upload_enabled?
 
-        id = [CarrierWave.generate_cache_id, SecureRandom.hex].join('-')
-        upload_path = File.join(TMP_UPLOAD_PATH, id)
-        direct_upload = ObjectStorage::DirectUpload.new(self.object_store_config, upload_path,
-          has_length: has_length, maximum_size: maximum_size)
+        ObjectStorage::ActiveStorage::DirectUpload.new(
+          blob_class: blob_class
+        ).to_hash
 
-        direct_upload.to_hash.merge(ID: id)
+        # id = [CarrierWave.generate_cache_id, SecureRandom.hex].join('-')
+        # upload_path = File.join(TMP_UPLOAD_PATH, id)
+        # direct_upload = ObjectStorage::DirectUpload.new(self.object_store_config, upload_path,
+        #   has_length: has_length, maximum_size: maximum_size)
+
+        # direct_upload.to_hash.merge(ID: id)
       end
     end
 

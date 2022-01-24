@@ -139,8 +139,8 @@ PARTITION BY RANGE (process_at);
 
 CREATE TABLE incident_management_pending_issue_escalations (
     id bigint NOT NULL,
-    rule_id bigint NOT NULL,
     issue_id bigint NOT NULL,
+    rule_id bigint NOT NULL,
     process_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone NOT NULL
@@ -166,7 +166,7 @@ CREATE TABLE verification_codes (
     phone text NOT NULL,
     CONSTRAINT check_9b84e6aaff CHECK ((char_length(code) <= 8)),
     CONSTRAINT check_ccc542256b CHECK ((char_length(visitor_id_code) <= 64)),
-    CONSTRAINT check_f5684c195b CHECK ((char_length(phone) <= 32))
+    CONSTRAINT check_f5684c195b CHECK ((char_length(phone) <= 50))
 )
 PARTITION BY RANGE (created_at);
 
@@ -10458,18 +10458,18 @@ CREATE TABLE application_settings (
     throttle_unauthenticated_api_enabled boolean DEFAULT false NOT NULL,
     throttle_unauthenticated_api_requests_per_period integer DEFAULT 3600 NOT NULL,
     throttle_unauthenticated_api_period_in_seconds integer DEFAULT 3600 NOT NULL,
-    jobs_per_stage_page_size integer DEFAULT 200 NOT NULL,
     sidekiq_job_limiter_mode smallint DEFAULT 1 NOT NULL,
     sidekiq_job_limiter_compression_threshold_bytes integer DEFAULT 100000 NOT NULL,
     sidekiq_job_limiter_limit_bytes integer DEFAULT 0 NOT NULL,
+    jobs_per_stage_page_size integer DEFAULT 200 NOT NULL,
     suggest_pipeline_enabled boolean DEFAULT true NOT NULL,
+    dependency_proxy_ttl_group_policy_worker_capacity integer DEFAULT 2 NOT NULL,
     throttle_unauthenticated_deprecated_api_requests_per_period integer DEFAULT 1800 NOT NULL,
     throttle_unauthenticated_deprecated_api_period_in_seconds integer DEFAULT 3600 NOT NULL,
     throttle_unauthenticated_deprecated_api_enabled boolean DEFAULT false NOT NULL,
     throttle_authenticated_deprecated_api_requests_per_period integer DEFAULT 3600 NOT NULL,
     throttle_authenticated_deprecated_api_period_in_seconds integer DEFAULT 3600 NOT NULL,
     throttle_authenticated_deprecated_api_enabled boolean DEFAULT false NOT NULL,
-    dependency_proxy_ttl_group_policy_worker_capacity smallint DEFAULT 2 NOT NULL,
     content_validation_endpoint_url text,
     encrypted_content_validation_api_key bytea,
     encrypted_content_validation_api_key_iv bytea,
@@ -10478,8 +10478,8 @@ CREATE TABLE application_settings (
     sentry_dsn text,
     sentry_clientside_dsn text,
     sentry_environment text,
-    max_ssh_key_lifetime integer,
     static_objects_external_storage_auth_token_encrypted text,
+    max_ssh_key_lifetime integer,
     future_subscriptions jsonb DEFAULT '[]'::jsonb NOT NULL,
     user_email_lookup_limit integer DEFAULT 60 NOT NULL,
     CONSTRAINT app_settings_container_reg_cleanup_tags_max_list_size_positive CHECK ((container_registry_cleanup_tags_service_max_list_size >= 0)),
@@ -15953,8 +15953,8 @@ CREATE TABLE members (
     expires_at date,
     ldap boolean DEFAULT false NOT NULL,
     override boolean DEFAULT false NOT NULL,
-    state smallint DEFAULT 0,
-    invite_email_success boolean DEFAULT true NOT NULL
+    invite_email_success boolean DEFAULT true NOT NULL,
+    state smallint DEFAULT 0
 );
 
 CREATE SEQUENCE members_id_seq
@@ -16925,6 +16925,56 @@ CREATE SEQUENCE operations_user_lists_id_seq
 
 ALTER SEQUENCE operations_user_lists_id_seq OWNED BY operations_user_lists.id;
 
+CREATE TABLE packages_attachments (
+    id bigint NOT NULL,
+    name text NOT NULL,
+    record_type character varying NOT NULL,
+    record_id bigint NOT NULL,
+    blob_id bigint NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    CONSTRAINT check_0d7c8d100b CHECK ((char_length(name) <= 255))
+);
+
+CREATE SEQUENCE packages_attachments_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE packages_attachments_id_seq OWNED BY packages_attachments.id;
+
+CREATE TABLE packages_blobs (
+    id bigint NOT NULL,
+    key text NOT NULL,
+    filename text NOT NULL,
+    content_type text,
+    metadata text,
+    service_name text NOT NULL,
+    byte_size bigint DEFAULT 0 NOT NULL,
+    checksum text,
+    sha256_checksum text,
+    sha512_checksum text,
+    created_at timestamp with time zone NOT NULL,
+    CONSTRAINT check_041d0cc245 CHECK ((char_length(key) <= 255)),
+    CONSTRAINT check_062236be1d CHECK ((char_length(sha256_checksum) <= 255)),
+    CONSTRAINT check_bb454fb00a CHECK ((char_length(sha512_checksum) <= 255)),
+    CONSTRAINT check_cb03c7980c CHECK ((char_length(metadata) <= 255)),
+    CONSTRAINT check_d9810f10c4 CHECK ((char_length(service_name) <= 255)),
+    CONSTRAINT check_f1e9ed978b CHECK ((char_length(checksum) <= 255)),
+    CONSTRAINT check_f713d04b78 CHECK ((char_length(filename) <= 255)),
+    CONSTRAINT check_f94c78ba70 CHECK ((char_length(content_type) <= 255))
+);
+
+CREATE SEQUENCE packages_blobs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE packages_blobs_id_seq OWNED BY packages_blobs.id;
+
 CREATE TABLE packages_build_infos (
     id bigint NOT NULL,
     package_id integer NOT NULL,
@@ -17418,6 +17468,7 @@ CREATE TABLE packages_package_files (
     verification_checksum bytea,
     verification_state smallint DEFAULT 0 NOT NULL,
     verification_started_at timestamp with time zone,
+    status smallint DEFAULT 0 NOT NULL,
     CONSTRAINT check_4c5e6bb0b3 CHECK ((file_store IS NOT NULL))
 );
 
@@ -17450,6 +17501,23 @@ CREATE SEQUENCE packages_packages_id_seq
     CACHE 1;
 
 ALTER SEQUENCE packages_packages_id_seq OWNED BY packages_packages.id;
+
+CREATE TABLE packages_pushes (
+    id bigint NOT NULL,
+    package_file_id bigint NOT NULL,
+    pipeline_id bigint NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+CREATE SEQUENCE packages_pushes_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE packages_pushes_id_seq OWNED BY packages_pushes.id;
 
 CREATE TABLE packages_pypi_metadata (
     package_id bigint NOT NULL,
@@ -20223,7 +20291,7 @@ CREATE TABLE user_details (
     registration_objective smallint,
     phone text,
     CONSTRAINT check_245664af82 CHECK ((char_length(webauthn_xid) <= 100)),
-    CONSTRAINT check_a73b398c60 CHECK ((char_length(phone) <= 32)),
+    CONSTRAINT check_a73b398c60 CHECK ((char_length(phone) <= 50)),
     CONSTRAINT check_b132136b01 CHECK ((char_length(other_role) <= 100)),
     CONSTRAINT check_eeeaf8d4f0 CHECK ((char_length(pronouns) <= 50)),
     CONSTRAINT check_f932ed37db CHECK ((char_length(pronunciation) <= 255))
@@ -21843,6 +21911,10 @@ ALTER TABLE ONLY operations_strategies_user_lists ALTER COLUMN id SET DEFAULT ne
 
 ALTER TABLE ONLY operations_user_lists ALTER COLUMN id SET DEFAULT nextval('operations_user_lists_id_seq'::regclass);
 
+ALTER TABLE ONLY packages_attachments ALTER COLUMN id SET DEFAULT nextval('packages_attachments_id_seq'::regclass);
+
+ALTER TABLE ONLY packages_blobs ALTER COLUMN id SET DEFAULT nextval('packages_blobs_id_seq'::regclass);
+
 ALTER TABLE ONLY packages_build_infos ALTER COLUMN id SET DEFAULT nextval('packages_build_infos_id_seq'::regclass);
 
 ALTER TABLE ONLY packages_composer_cache_files ALTER COLUMN id SET DEFAULT nextval('packages_composer_cache_files_id_seq'::regclass);
@@ -21886,6 +21958,8 @@ ALTER TABLE ONLY packages_package_file_build_infos ALTER COLUMN id SET DEFAULT n
 ALTER TABLE ONLY packages_package_files ALTER COLUMN id SET DEFAULT nextval('packages_package_files_id_seq'::regclass);
 
 ALTER TABLE ONLY packages_packages ALTER COLUMN id SET DEFAULT nextval('packages_packages_id_seq'::regclass);
+
+ALTER TABLE ONLY packages_pushes ALTER COLUMN id SET DEFAULT nextval('packages_pushes_id_seq'::regclass);
 
 ALTER TABLE ONLY packages_tags ALTER COLUMN id SET DEFAULT nextval('packages_tags_id_seq'::regclass);
 
@@ -23631,6 +23705,12 @@ ALTER TABLE ONLY operations_strategies_user_lists
 ALTER TABLE ONLY operations_user_lists
     ADD CONSTRAINT operations_user_lists_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY packages_attachments
+    ADD CONSTRAINT packages_attachments_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY packages_blobs
+    ADD CONSTRAINT packages_blobs_pkey PRIMARY KEY (id);
+
 ALTER TABLE ONLY packages_build_infos
     ADD CONSTRAINT packages_build_infos_pkey PRIMARY KEY (id);
 
@@ -23714,6 +23794,9 @@ ALTER TABLE ONLY packages_package_files
 
 ALTER TABLE ONLY packages_packages
     ADD CONSTRAINT packages_packages_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY packages_pushes
+    ADD CONSTRAINT packages_pushes_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY packages_pypi_metadata
     ADD CONSTRAINT packages_pypi_metadata_pkey PRIMARY KEY (package_id);
@@ -26024,11 +26107,13 @@ CREATE INDEX index_events_author_id_project_id_action_target_type_created_at ON 
 
 CREATE INDEX index_events_on_action ON events USING btree (action);
 
+CREATE INDEX index_events_on_author_id_and_action_and_id ON events USING btree (author_id, action, id);
+
 CREATE INDEX index_events_on_author_id_and_created_at ON events USING btree (author_id, created_at);
 
 CREATE INDEX index_events_on_author_id_and_created_at_merge_requests ON events USING btree (author_id, created_at) WHERE ((target_type)::text = 'MergeRequest'::text);
 
-CREATE INDEX index_events_on_created_at_and_id ON events USING btree (created_at, id) WHERE (created_at > '2021-08-27 00:00:00+00'::timestamp with time zone);
+CREATE INDEX index_events_on_created_at_and_id ON events USING btree (created_at, id) WHERE (created_at > '2021-08-27 02:00:00+02'::timestamp with time zone);
 
 CREATE INDEX index_events_on_group_id_partial ON events USING btree (group_id) WHERE (group_id IS NOT NULL);
 
@@ -26844,6 +26929,12 @@ CREATE UNIQUE INDEX index_ops_feature_flags_issues_on_feature_flag_id_and_issue_
 
 CREATE UNIQUE INDEX index_ops_strategies_user_lists_on_strategy_id_and_user_list_id ON operations_strategies_user_lists USING btree (strategy_id, user_list_id);
 
+CREATE UNIQUE INDEX index_package_attachments_uniqueness ON packages_attachments USING btree (record_type, record_id, name, blob_id);
+
+CREATE INDEX index_packages_attachments_on_blob_id ON packages_attachments USING btree (blob_id);
+
+CREATE UNIQUE INDEX index_packages_blobs_on_key ON packages_blobs USING btree (key);
+
 CREATE INDEX index_packages_build_infos_on_pipeline_id ON packages_build_infos USING btree (pipeline_id);
 
 CREATE INDEX index_packages_build_infos_package_id_pipeline_id ON packages_build_infos USING btree (package_id, pipeline_id);
@@ -26904,6 +26995,8 @@ CREATE INDEX index_packages_package_files_on_package_id_and_file_name ON package
 
 CREATE INDEX index_packages_package_files_on_package_id_id ON packages_package_files USING btree (package_id, id);
 
+CREATE INDEX index_packages_package_files_on_package_id_status_and_id ON packages_package_files USING btree (package_id, status, id);
+
 CREATE INDEX index_packages_package_files_on_verification_state ON packages_package_files USING btree (verification_state);
 
 CREATE INDEX index_packages_packages_on_creator_id ON packages_packages USING btree (creator_id);
@@ -26921,6 +27014,10 @@ CREATE INDEX index_packages_packages_on_project_id_and_status ON packages_packag
 CREATE INDEX index_packages_packages_on_project_id_and_version ON packages_packages USING btree (project_id, version);
 
 CREATE INDEX index_packages_project_id_name_partial_for_nuget ON packages_packages USING btree (project_id, name) WHERE (((name)::text <> 'NuGet.Temporary.Package'::text) AND (version IS NOT NULL) AND (package_type = 4));
+
+CREATE INDEX index_packages_pushes_on_package_file_id ON packages_pushes USING btree (package_file_id);
+
+CREATE INDEX index_packages_pushes_on_pipeline_id ON packages_pushes USING btree (pipeline_id);
 
 CREATE INDEX index_packages_tags_on_package_id ON packages_tags USING btree (package_id);
 
@@ -29910,6 +30007,9 @@ ALTER TABLE ONLY clusters_applications_elastic_stacks
 ALTER TABLE ONLY incident_management_oncall_participants
     ADD CONSTRAINT fk_rails_032b12996a FOREIGN KEY (oncall_rotation_id) REFERENCES incident_management_oncall_rotations(id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY packages_pushes
+    ADD CONSTRAINT fk_rails_03684ed6da FOREIGN KEY (pipeline_id) REFERENCES ci_pipelines(id) ON DELETE CASCADE;
+
 ALTER TABLE ONLY events
     ADD CONSTRAINT fk_rails_0434b48643 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
 
@@ -31119,6 +31219,9 @@ ALTER TABLE ONLY packages_events
 ALTER TABLE ONLY project_settings
     ADD CONSTRAINT fk_rails_c6df6e6328 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY packages_pushes
+    ADD CONSTRAINT fk_rails_c71dcafff0 FOREIGN KEY (package_file_id) REFERENCES packages_package_files(id) ON DELETE CASCADE;
+
 ALTER TABLE ONLY container_expiration_policies
     ADD CONSTRAINT fk_rails_c7360f09ad FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
 
@@ -31403,6 +31506,9 @@ ALTER TABLE ONLY resource_state_events
 
 ALTER TABLE ONLY packages_debian_group_components
     ADD CONSTRAINT fk_rails_f5f1ef54c6 FOREIGN KEY (distribution_id) REFERENCES packages_debian_group_distributions(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY packages_attachments
+    ADD CONSTRAINT fk_rails_f6423b1cde FOREIGN KEY (blob_id) REFERENCES packages_blobs(id);
 
 ALTER TABLE ONLY incident_management_oncall_shifts
     ADD CONSTRAINT fk_rails_f6eef06841 FOREIGN KEY (participant_id) REFERENCES incident_management_oncall_participants(id) ON DELETE CASCADE;

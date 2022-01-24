@@ -40,6 +40,7 @@ module API
 
         params = { has_length: has_length }
         params[:maximum_size] = maximum_size unless has_length
+        params[:blob_class] = ::Packages::Blob
         ::Packages::PackageFileUploader.workhorse_authorize(**params)
       end
 

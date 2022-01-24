@@ -36,11 +36,12 @@ module Packages
 
       def create_package_file(package)
         file_params = {
-          file: params[:file],
-          size: params[:file].size,
-          file_sha256: params[:file].sha256,
+          # file: params[:file],
+          # size: params[:file].size,
+          # file_sha256: params[:file].sha256,
           file_name: params[:file_name],
-          build: params[:build]
+          build: params[:build],
+          signed_blob_id: params['file.blob-signed-id'.to_sym]
         }
 
         ::Packages::CreatePackageFileService.new(package, file_params).execute

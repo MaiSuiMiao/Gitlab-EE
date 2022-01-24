@@ -47,6 +47,8 @@ type SaveFileOpts struct {
 	UseWorkhorseClient bool
 	// If UseWorkhorseClient is true, this is the temporary object name to store the file
 	RemoteTempObjectID string
+	// Blob signed id
+	BlobSignedId string
 	// Workhorse object storage client (e.g. S3) parameters
 	ObjectStorageConfig ObjectStorageConfig
 	// Deadline it the S3 operation deadline, the upload will be aborted if not completed in time
@@ -96,6 +98,7 @@ func GetOpts(apiResponse *api.Response) (*SaveFileOpts, error) {
 		PutHeaders:         apiResponse.RemoteObject.PutHeaders,
 		UseWorkhorseClient: apiResponse.RemoteObject.UseWorkhorseClient,
 		RemoteTempObjectID: apiResponse.RemoteObject.RemoteTempObjectID,
+		BlobSignedId:       apiResponse.RemoteObject.BlobSignedId,
 		Deadline:           time.Now().Add(timeout),
 		MaximumSize:        apiResponse.MaximumSize,
 	}
@@ -104,9 +107,10 @@ func GetOpts(apiResponse *api.Response) (*SaveFileOpts, error) {
 		return nil, errors.New("API response has both TempPath and RemoteObject")
 	}
 
-	if opts.LocalTempPath == "" && opts.RemoteID == "" {
-		return nil, errors.New("API response has neither TempPath nor RemoteObject")
-	}
+	// Disable RemoteID
+	// if opts.LocalTempPath == "" && opts.RemoteID == "" {
+	// 	return nil, errors.New("API response has neither TempPath nor RemoteObject")
+	// }
 
 	objectStorageParams := apiResponse.RemoteObject.ObjectStorage
 	if opts.UseWorkhorseClient && objectStorageParams != nil {

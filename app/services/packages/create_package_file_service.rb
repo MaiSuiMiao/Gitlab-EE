@@ -22,6 +22,7 @@ module Packages
         package_file.package_file_build_infos << package_file.package_file_build_infos.build(pipeline: params[:build].pipeline)
       end
 
+      package_file.active_storage_file.attach(params[:signed_blob_id]) # This is awesome!
       package_file.save!
       package_file
     end

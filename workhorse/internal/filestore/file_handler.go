@@ -33,6 +33,8 @@ type FileHandler struct {
 	RemoteID string
 	// RemoteURL is ObjectStore URL provided by GitLab Rails
 	RemoteURL string
+	// Blob signed id
+	BlobSignedId string
 
 	// Size is the persisted file size
 	Size int64
@@ -100,6 +102,9 @@ func (fh *FileHandler) GitLabFinalizeFields(prefix string) (map[string]string, e
 	}
 	data[key("gitlab-workhorse-upload")] = jwtData
 
+	// Bad, this should go in the jwt token
+	data[key("blob-signed-id")] = fh.BlobSignedId
+
 	return data, nil
 }
 
@@ -114,6 +119,7 @@ func SaveFileFromReader(ctx context.Context, reader io.Reader, size int64, opts 
 		Name:      opts.TempFilePrefix,
 		RemoteID:  opts.RemoteID,
 		RemoteURL: opts.RemoteURL,
+		BlobSignedId: opts.BlobSignedId,
 	}
 	uploadStartTime := time.Now()
 	defer func() { fh.uploadDuration = time.Since(uploadStartTime).Seconds() }()

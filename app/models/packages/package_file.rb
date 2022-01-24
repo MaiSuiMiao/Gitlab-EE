@@ -24,7 +24,7 @@ class Packages::PackageFile < ApplicationRecord
   accepts_nested_attributes_for :helm_file_metadatum
 
   validates :package, presence: true
-  validates :file, presence: true
+  # validates :file, presence: true
   validates :file_name, presence: true
 
   validates :file_name, uniqueness: { scope: :package }, if: -> { package&.pypi? }
@@ -83,6 +83,8 @@ class Packages::PackageFile < ApplicationRecord
   end
 
   mount_file_store_uploader Packages::PackageFileUploader
+
+  has_one_file_attached(:active_storage_file, service: :packages)
 
   update_project_statistics project_statistics_name: :packages_size
 
