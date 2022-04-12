@@ -69,4 +69,9 @@ Rails.application.configure do
 
     config.middleware.delete BetterErrors::Middleware
   end
+
+  config.eager_load_paths += Dir["lib/gitlab/storage/authorizer/**/*.rb"]
+  ActiveSupport::Reloader.to_prepare do
+    Dir["lib/gitlab/storage/authorizer/**/*.rb"].each { |f| require_dependency("#{Dir.pwd}/#{f}") }
+  end
 end

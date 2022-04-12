@@ -211,10 +211,28 @@ func rebaseUrl(url *url.URL, onto *url.URL, suffix string) *url.URL {
 	return &newUrl
 }
 
+func rebaseUrlOntoSingleAuthorizePoint(url *url.URL, onto *url.URL, suffix string) *url.URL {
+	if strings.Contains(url.Path, ".git") {
+		return rebaseUrl(url, onto, suffix)
+	}
+
+	newUrl := *url
+	newUrl.Scheme = onto.Scheme
+	newUrl.Host = onto.Host
+	newUrl.Path = "/api/v4/gitlab/storage/authorize"
+
+	if onto.RawQuery == "" || newUrl.RawQuery == "" {
+		newUrl.RawQuery = onto.RawQuery + newUrl.RawQuery
+	} else {
+		newUrl.RawQuery = onto.RawQuery + "&" + newUrl.RawQuery
+	}
+	return &newUrl
+}
+
 func (api *API) newRequest(r *http.Request, suffix string) (*http.Request, error) {
 	authReq := &http.Request{
 		Method: r.Method,
-		URL:    rebaseUrl(r.URL, api.URL, suffix),
+		URL:    rebaseUrlOntoSingleAuthorizePoint(r.URL, api.URL, suffix),
 		Header: helper.HeaderClone(r.Header),
 	}
 
@@ -246,6 +264,8 @@ func (api *API) newRequest(r *http.Request, suffix string) (*http.Request, error
 	// This allows the Host header received by the backend to be consistent with other
 	// requests not going through gitlab-workhorse.
 	authReq.Host = r.Host
+
+	authReq.Header.Add("Workhorse-Upload-Url", r.URL.String())
 
 	return authReq, nil
 }

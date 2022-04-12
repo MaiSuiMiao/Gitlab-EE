@@ -298,6 +298,7 @@ module API
       mount ::API::Users
       mount ::API::Version
       mount ::API::Wikis
+      mount ::API::Storage::Authorize
     end
 
     mount ::API::Internal::Base
