@@ -67,6 +67,7 @@ exports[`ee/BoardContentSidebar incident sidebar matches the snapshot 1`] = `
     labelsfilterbasepath=""
     labelsfilterparam="label_name"
     labelslisttitle="Assign labels"
+    selectedlabels=""
     variant="sidebar"
     workspacetype="project"
   >
@@ -620,6 +621,7 @@ exports[`ee/BoardContentSidebar issue sidebar matches the snapshot 1`] = `
     labelsfilterbasepath=""
     labelsfilterparam="label_name"
     labelslisttitle="Assign labels"
+    selectedlabels=""
     variant="sidebar"
     workspacetype="project"
   >
