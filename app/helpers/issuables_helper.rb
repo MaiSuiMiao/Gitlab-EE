@@ -361,6 +361,28 @@ module IssuablesHelper
     end
   end
 
+  def issuable_label_selector_data(project, issuable)
+    initial_labels = issuable.labels.map do |label|
+      {
+        __typename: "Label",
+        id: label.id,
+        title: label.title,
+        description: label.description,
+        color: label.color,
+        text_color: label.text_color
+      }
+    end
+
+    {
+      field_name: "#{issuable.class.model_name.param_key}[label_ids][]",
+      full_path: project.full_path,
+      initial_labels: initial_labels.to_json,
+      issuable_type: issuable.to_ability_name,
+      labels_filter_base_path: project_issues_path(project),
+      labels_manage_path: project_labels_path(project)
+    }
+  end
+
   private
 
   def sidebar_gutter_collapsed?

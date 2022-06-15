@@ -525,4 +525,61 @@ RSpec.describe IssuablesHelper do
       expect(helper.sidebar_milestone_tooltip_label(milestone)).to eq('&lt;img onerror=alert(1)&gt;<br/>Milestone')
     end
   end
+
+  describe '#issuable_label_selector_data' do
+    let_it_be(:project) { create(:project, :repository) }
+
+    context 'with a new issuable' do
+      let_it_be(:issuable) { build(:issue, project: project) }
+
+      it 'returns the expected data' do
+        expect(helper.issuable_label_selector_data(project, issuable)).to match({
+          field_name: "#{issuable.class.model_name.param_key}[label_ids][]",
+          full_path: project.full_path,
+          initial_labels: '[]',
+          issuable_type: issuable.to_ability_name,
+          labels_filter_base_path: project_issues_path(project),
+          labels_manage_path: project_labels_path(project)
+        })
+      end
+    end
+
+    context 'with an existing issuable' do
+      let_it_be(:label) { create(:label, name: 'Bug') }
+      let_it_be(:label2) { create(:label, name: 'Community contribution') }
+      let_it_be(:issuable) do
+        create(:merge_request, source_project: project, target_project: project, labels: [label, label2])
+      end
+
+      it 'returns the expected data' do
+        initial_labels = [
+          {
+            __typename: "Label",
+            id: label.id,
+            title: label.title,
+            description: label.description,
+            color: label.color,
+            text_color: label.text_color
+          },
+          {
+            __typename: "Label",
+            id: label2.id,
+            title: label2.title,
+            description: label2.description,
+            color: label2.color,
+            text_color: label2.text_color
+          }
+        ]
+
+        expect(helper.issuable_label_selector_data(project, issuable)).to match({
+          field_name: "#{issuable.class.model_name.param_key}[label_ids][]",
+          full_path: project.full_path,
+          initial_labels: initial_labels.to_json,
+          issuable_type: issuable.to_ability_name,
+          labels_filter_base_path: project_issues_path(project),
+          labels_manage_path: project_labels_path(project)
+        })
+      end
+    end
+  end
 end

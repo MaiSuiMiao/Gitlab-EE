@@ -16,6 +16,7 @@ RSpec.describe 'New/edit issue', :js do
   let_it_be(:confidential_issue) { create(:issue, project: project, assignees: [user], milestone: milestone, confidential: true) }
 
   let(:current_user) { user }
+  let(:visible_label_selection_on_metadata) { false }
 
   before_all do
     project.add_maintainer(user)
@@ -25,6 +26,7 @@ RSpec.describe 'New/edit issue', :js do
 
   before do
     stub_licensed_features(multiple_issue_assignees: false, issue_weights: false)
+    stub_feature_flags(visible_label_selection_on_metadata: visible_label_selection_on_metadata)
 
     sign_in(current_user)
   end
@@ -112,78 +114,168 @@ RSpec.describe 'New/edit issue', :js do
       end
     end
 
-    it 'allows user to create new issue' do
-      fill_in 'issue_title', with: 'title'
-      fill_in 'issue_description', with: 'title'
+    context 'with the visible_label_selection_on_metadata feature flag enabled' do
+      let(:visible_label_selection_on_metadata) { true }
 
-      expect(find('a', text: 'Assign to me')).to be_visible
-      click_button 'Unassigned'
+      it 'allows user to create new issue' do
+        fill_in 'issue_title', with: 'title'
+        fill_in 'issue_description', with: 'title'
 
-      wait_for_requests
+        expect(find('a', text: 'Assign to me')).to be_visible
+        click_button 'Unassigned'
 
-      page.within '.dropdown-menu-user' do
-        click_link user2.name
-      end
-      expect(find('input[name="issue[assignee_ids][]"]', visible: false).value).to match(user2.id.to_s)
-      page.within '.js-assignee-search' do
-        expect(page).to have_content user2.name
-      end
-      expect(find('a', text: 'Assign to me')).to be_visible
+        wait_for_requests
 
-      click_link 'Assign to me'
-      assignee_ids = page.all('input[name="issue[assignee_ids][]"]', visible: false)
-
-      expect(assignee_ids[0].value).to match(user.id.to_s)
-
-      page.within '.js-assignee-search' do
-        expect(page).to have_content user.name
-      end
-      expect(find('a', text: 'Assign to me', visible: false)).not_to be_visible
-
-      click_button 'Milestone'
-      page.within '.issue-milestone' do
-        click_link milestone.title
-      end
-      expect(find('input[name="issue[milestone_id]"]', visible: false).value).to match(milestone.id.to_s)
-      page.within '.js-milestone-select' do
-        expect(page).to have_content milestone.title
-      end
-
-      click_button 'Labels'
-      page.within '.dropdown-menu-labels' do
-        click_link label.title
-        click_link label2.title
-      end
-
-      find('.js-issuable-form-dropdown.js-label-select').click
-
-      page.within '.js-label-select' do
-        expect(page).to have_content label.title
-      end
-      expect(page.all('input[name="issue[label_ids][]"]', visible: false)[1].value).to match(label.id.to_s)
-      expect(page.all('input[name="issue[label_ids][]"]', visible: false)[2].value).to match(label2.id.to_s)
-
-      click_button 'Create issue'
-
-      page.within '.issuable-sidebar' do
-        page.within '.assignee' do
-          expect(page).to have_content "Assignee"
+        page.within '.dropdown-menu-user' do
+          click_link user2.name
         end
+        expect(find('input[name="issue[assignee_ids][]"]', visible: false).value).to match(user2.id.to_s)
+        page.within '.js-assignee-search' do
+          expect(page).to have_content user2.name
+        end
+        expect(find('a', text: 'Assign to me')).to be_visible
 
-        page.within '.milestone' do
+        click_link 'Assign to me'
+        assignee_ids = page.all('input[name="issue[assignee_ids][]"]', visible: false)
+
+        expect(assignee_ids[0].value).to match(user.id.to_s)
+
+        page.within '.js-assignee-search' do
+          expect(page).to have_content user.name
+        end
+        expect(find('a', text: 'Assign to me', visible: false)).not_to be_visible
+
+        click_button 'Milestone'
+        page.within '.issue-milestone' do
+          click_link milestone.title
+        end
+        expect(find('input[name="issue[milestone_id]"]', visible: false).value).to match(milestone.id.to_s)
+        page.within '.js-milestone-select' do
           expect(page).to have_content milestone.title
         end
 
-        page.within '.labels' do
-          expect(page).to have_content label.title
-          expect(page).to have_content label2.title
+        click_button _('Select label')
+
+        wait_for_all_requests
+
+        page.within '[data-testid="sidebar-labels"]' do
+          click_button label.title
+          click_button label2.title
+          click_button _('Close')
+
+          wait_for_requests
+
+          page.within('[data-testid="embedded-labels-list"]') do
+            expect(page).to have_content(label.title)
+            expect(page).to have_content(label2.title)
+          end
+        end
+
+        expect(page.all('input[name="issue[label_ids][]"]', visible: false)
+                   .map(&:value))
+          .to contain_exactly(label.id.to_s, label2.id.to_s)
+
+        click_button 'Create issue'
+
+        page.within '.issuable-sidebar' do
+          page.within '.assignee' do
+            expect(page).to have_content "Assignee"
+          end
+
+          page.within '.milestone' do
+            expect(page).to have_content milestone.title
+          end
+
+          page.within '.labels' do
+            expect(page).to have_content label.title
+            expect(page).to have_content label2.title
+          end
+        end
+
+        page.within '.breadcrumbs' do
+          issue = Issue.find_by(title: 'title')
+
+          expect(page).to have_text("Issues #{issue.to_reference}")
         end
       end
+    end
 
-      page.within '.breadcrumbs' do
-        issue = Issue.find_by(title: 'title')
+    context 'with the visible_label_selection_on_metadata feature flag disabled' do
+      let(:visible_label_selection_on_metadata) { false }
 
-        expect(page).to have_text("Issues #{issue.to_reference}")
+      it 'allows user to create new issue' do
+        fill_in 'issue_title', with: 'title'
+        fill_in 'issue_description', with: 'title'
+
+        expect(find('a', text: 'Assign to me')).to be_visible
+        click_button 'Unassigned'
+
+        wait_for_requests
+
+        page.within '.dropdown-menu-user' do
+          click_link user2.name
+        end
+        expect(find('input[name="issue[assignee_ids][]"]', visible: false).value).to match(user2.id.to_s)
+        page.within '.js-assignee-search' do
+          expect(page).to have_content user2.name
+        end
+        expect(find('a', text: 'Assign to me')).to be_visible
+
+        click_link 'Assign to me'
+        assignee_ids = page.all('input[name="issue[assignee_ids][]"]', visible: false)
+
+        expect(assignee_ids[0].value).to match(user.id.to_s)
+
+        page.within '.js-assignee-search' do
+          expect(page).to have_content user.name
+        end
+        expect(find('a', text: 'Assign to me', visible: false)).not_to be_visible
+
+        click_button 'Milestone'
+        page.within '.issue-milestone' do
+          click_link milestone.title
+        end
+        expect(find('input[name="issue[milestone_id]"]', visible: false).value).to match(milestone.id.to_s)
+        page.within '.js-milestone-select' do
+          expect(page).to have_content milestone.title
+        end
+
+        click_button 'Labels'
+        page.within '.dropdown-menu-labels' do
+          click_link label.title
+          click_link label2.title
+        end
+
+        find('.js-issuable-form-dropdown.js-label-select').click
+
+        page.within '.js-label-select' do
+          expect(page).to have_content label.title
+        end
+        expect(page.all('input[name="issue[label_ids][]"]', visible: false)[1].value).to match(label.id.to_s)
+        expect(page.all('input[name="issue[label_ids][]"]', visible: false)[2].value).to match(label2.id.to_s)
+
+        click_button 'Create issue'
+
+        page.within '.issuable-sidebar' do
+          page.within '.assignee' do
+            expect(page).to have_content "Assignee"
+          end
+
+          page.within '.milestone' do
+            expect(page).to have_content milestone.title
+          end
+
+          page.within '.labels' do
+            expect(page).to have_content label.title
+            expect(page).to have_content label2.title
+          end
+        end
+
+        page.within '.breadcrumbs' do
+          issue = Issue.find_by(title: 'title')
+
+          expect(page).to have_text("Issues #{issue.to_reference}")
+        end
       end
     end
 
@@ -195,31 +287,87 @@ RSpec.describe 'New/edit issue', :js do
       end
     end
 
-    it 'correctly updates the dropdown toggle when removing a label' do
-      click_button 'Labels'
+    context 'with the visible_label_selection_on_metadata feature flag enabled' do
+      let(:visible_label_selection_on_metadata) { true }
 
-      page.within '.dropdown-menu-labels' do
-        click_link label.title
+      it 'correctly updates the dropdown toggle when removing a label' do
+        click_button _('Select label')
+
+        wait_for_all_requests
+
+        page.within '[data-testid="sidebar-labels"]' do
+          click_button label.title
+          click_button _('Close')
+
+          wait_for_requests
+
+          page.within('[data-testid="embedded-labels-list"]') do
+            expect(page).to have_content(label.title)
+          end
+
+          expect(page.find('.gl-new-dropdown-button-text')).to have_content(label.title)
+        end
+
+        click_button label.title, class: 'gl-dropdown-toggle'
+
+        wait_for_all_requests
+
+        page.within '[data-testid="sidebar-labels"]' do
+          click_button label.title, class: 'dropdown-item'
+          click_button _('Close')
+
+          wait_for_requests
+
+          expect(page).not_to have_selector('[data-testid="embedded-labels-list"]')
+          expect(page.find('.gl-new-dropdown-button-text')).to have_content(_('Select label'))
+        end
       end
 
-      expect(find('.js-label-select')).to have_content(label.title)
+      it 'clears label search input field when a label is selected' do
+        click_button _('Select label')
 
-      page.within '.dropdown-menu-labels' do
-        click_link label.title
+        page.within '[data-testid="sidebar-labels"]' do
+          search_field = find('input[type="search"]')
+
+          search_field.set(label2.title)
+
+          wait_for_requests
+
+          click_button label2.title, class: 'dropdown-item'
+          expect(search_field.value).to eq ''
+        end
       end
-
-      expect(find('.js-label-select')).to have_content('Labels')
     end
 
-    it 'clears label search input field when a label is selected' do
-      click_button 'Labels'
+    context 'with the visible_label_selection_on_metadata feature flag disabled' do
+      let(:visible_label_selection_on_metadata) { false }
 
-      page.within '.dropdown-menu-labels' do
-        search_field = find('input[type="search"]')
+      it 'correctly updates the dropdown toggle when removing a label' do
+        click_button 'Labels'
 
-        search_field.set(label2.title)
-        click_link label2.title
-        expect(search_field.value).to eq ''
+        page.within '.dropdown-menu-labels' do
+          click_link label.title
+        end
+
+        expect(find('.js-label-select')).to have_content(label.title)
+
+        page.within '.dropdown-menu-labels' do
+          click_link label.title
+        end
+
+        expect(find('.js-label-select')).to have_content('Labels')
+      end
+
+      it 'clears label search input field when a label is selected' do
+        click_button 'Labels'
+
+        page.within '.dropdown-menu-labels' do
+          search_field = find('input[type="search"]')
+
+          search_field.set(label2.title)
+          click_link label2.title
+          expect(search_field.value).to eq ''
+        end
       end
     end
 
@@ -428,44 +576,104 @@ RSpec.describe 'New/edit issue', :js do
       visit edit_project_issue_path(project, issue)
     end
 
-    it 'allows user to update issue' do
-      expect(find('input[name="issue[assignee_ids][]"]', visible: false).value).to match(user.id.to_s)
-      expect(find('input[name="issue[milestone_id]"]', visible: false).value).to match(milestone.id.to_s)
-      expect(find('a', text: 'Assign to me', visible: false)).not_to be_visible
+    context 'with the visible_label_selection_on_metadata feature flag enabled' do
+      let(:visible_label_selection_on_metadata) { true }
 
-      page.within '.js-user-search' do
-        expect(page).to have_content user.name
-      end
+      it 'allows user to update issue' do
+        expect(find('input[name="issue[assignee_ids][]"]', visible: false).value).to match(user.id.to_s)
+        expect(find('input[name="issue[milestone_id]"]', visible: false).value).to match(milestone.id.to_s)
+        expect(find('a', text: 'Assign to me', visible: false)).not_to be_visible
 
-      page.within '.js-milestone-select' do
-        expect(page).to have_content milestone.title
-      end
-
-      click_button 'Labels'
-      page.within '.dropdown-menu-labels' do
-        click_link label.title
-        click_link label2.title
-      end
-      page.within '.js-label-select' do
-        expect(page).to have_content label.title
-      end
-      expect(page.all('input[name="issue[label_ids][]"]', visible: false)[1].value).to match(label.id.to_s)
-      expect(page.all('input[name="issue[label_ids][]"]', visible: false)[2].value).to match(label2.id.to_s)
-
-      click_button 'Save changes'
-
-      page.within '.issuable-sidebar' do
-        page.within '.assignee' do
+        page.within '.js-user-search' do
           expect(page).to have_content user.name
         end
 
-        page.within '.milestone' do
+        page.within '.js-milestone-select' do
           expect(page).to have_content milestone.title
         end
 
-        page.within '.labels' do
+        click_button _('Select label')
+
+        wait_for_all_requests
+
+        page.within '[data-testid="sidebar-labels"]' do
+          click_button label.title
+          click_button label2.title
+          click_button _('Close')
+
+          wait_for_requests
+
+          page.within('[data-testid="embedded-labels-list"]') do
+            expect(page).to have_content(label.title)
+            expect(page).to have_content(label2.title)
+          end
+        end
+
+        expect(page.all('input[name="issue[label_ids][]"]', visible: false)
+          .map(&:value))
+          .to contain_exactly(label.id.to_s, label2.id.to_s)
+
+        click_button 'Save changes'
+
+        page.within '.issuable-sidebar' do
+          page.within '.assignee' do
+            expect(page).to have_content user.name
+          end
+
+          page.within '.milestone' do
+            expect(page).to have_content milestone.title
+          end
+
+          page.within '.labels' do
+            expect(page).to have_content label.title
+            expect(page).to have_content label2.title
+          end
+        end
+      end
+    end
+
+    context 'with the visible_label_selection_on_metadata feature flag disabled' do
+      let(:visible_label_selection_on_metadata) { false }
+
+      it 'allows user to update issue' do
+        expect(find('input[name="issue[assignee_ids][]"]', visible: false).value).to match(user.id.to_s)
+        expect(find('input[name="issue[milestone_id]"]', visible: false).value).to match(milestone.id.to_s)
+        expect(find('a', text: 'Assign to me', visible: false)).not_to be_visible
+
+        page.within '.js-user-search' do
+          expect(page).to have_content user.name
+        end
+
+        page.within '.js-milestone-select' do
+          expect(page).to have_content milestone.title
+        end
+
+        click_button 'Labels'
+        page.within '.dropdown-menu-labels' do
+          click_link label.title
+          click_link label2.title
+        end
+        page.within '.js-label-select' do
           expect(page).to have_content label.title
-          expect(page).to have_content label2.title
+        end
+        expect(page.all('input[name="issue[label_ids][]"]', visible: false)[1].value).to match(label.id.to_s)
+        expect(page.all('input[name="issue[label_ids][]"]', visible: false)[2].value).to match(label2.id.to_s)
+
+        click_button 'Save changes'
+
+        page.within '.issuable-sidebar' do
+          page.within '.assignee' do
+            expect(page).to have_content user.name
+          end
+
+          page.within '.milestone' do
+            expect(page).to have_content milestone.title
+          end
+
+          page.within '.labels' do
+            expect(page).to have_content label.title
+            expect(page).to have_content label2.title
+          end
         end
       end
     end
@@ -501,22 +709,55 @@ RSpec.describe 'New/edit issue', :js do
       visit new_project_issue_path(sub_group_project)
     end
 
-    it 'creates project label from dropdown' do
-      click_button 'Labels'
+    context 'with the visible_label_selection_on_metadata feature flag enabled' do
+      let(:visible_label_selection_on_metadata) { true }
 
-      click_link 'Create project label'
+      it 'creates project label from dropdown' do
+        click_button _('Select label')
 
-      page.within '.dropdown-new-label' do
-        fill_in 'new_label_name', with: 'test label'
-        first('.suggest-colors-dropdown a').click
+        wait_for_all_requests
 
-        click_button 'Create'
+        page.within '[data-testid="sidebar-labels"]' do
+          click_button _('Create project label')
 
-        wait_for_requests
+          wait_for_requests
+        end
+
+        page.within '.js-labels-create' do
+          find('[data-testid="label-title-input"]').fill_in with: 'test label'
+          first('.suggest-colors-dropdown a').click
+
+          click_button 'Create'
+
+          wait_for_requests
+        end
+
+        page.within '.js-labels-list' do
+          expect(page).to have_button 'test label'
+        end
       end
+    end
 
-      page.within '.dropdown-menu-labels' do
-        expect(page).to have_link 'test label'
+    context 'with the visible_label_selection_on_metadata feature flag disabled' do
+      let(:visible_label_selection_on_metadata) { false }
+
+      it 'creates project label from dropdown' do
+        click_button 'Labels'
+
+        click_link 'Create project label'
+
+        page.within '.dropdown-new-label' do
+          fill_in 'new_label_name', with: 'test label'
+          first('.suggest-colors-dropdown a').click
+
+          click_button 'Create'
+
+          wait_for_requests
+        end
+
+        page.within '.dropdown-menu-labels' do
+          expect(page).to have_link 'test label'
+        end
       end
     end
   end
